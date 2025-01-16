@@ -23,6 +23,7 @@ Options:
     -V, --verbose     enable debug
     -b, --branch      branch or tag name
     -R, --recurse     recurse into directory
+    -s, --stream      stream output (bypass fzf and bat)
 
 Dependencies: fzf, jq, bat
 
@@ -36,6 +37,7 @@ EOF
 repo=""
 branch=""
 recurse=""
+stream=""
 
 gh_list() {
   gh api "repos/$repo/git/trees/$branch" \
@@ -90,6 +92,16 @@ gh_list_r() {
     --bind 'ctrl-w:backward-kill-word'
 }
 
+gh_list_stream_r() {
+  gh api "repos/$repo/git/trees/$branch?recursive=1" \
+    --jq '.tree[] | if .type == "tree" then "d "+.path else "f "+.path end' | cat
+}
+
+gh_list_stream() {
+  gh api "repos/$repo/git/trees/$branch" \
+    --jq '.tree[] | if .type == "tree" then "d "+.path else "f "+.path end' | cat
+}
+
 while [[ $# -gt 0 ]]; do
   case "$1" in
     -h | --help)
@@ -106,6 +118,10 @@ while [[ $# -gt 0 ]]; do
       ;;
     -R | --recurse)
       recurse=true
+      shift
+      ;;
+    -s | --stream)
+      stream=true
       shift
       ;;
     *)
@@ -139,7 +155,13 @@ if [[ ! $branch ]]; then
 fi
 
 if [[ $recurse ]]; then
-  gh_list_r "$repo"
+  if [[ $stream ]]; then
+    gh_list_stream_r "$repo"
+  else
+    gh_list_r "$repo"
+  fi
+elif [[ $stream ]]; then
+  gh_list_stream "$repo"
 else
   gh_list "$repo"
 fi
